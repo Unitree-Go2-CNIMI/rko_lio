@@ -112,7 +112,7 @@ public:
    * @param extrinsic_imu2base Extrinsic transform from IMU to base frame.
    * @param raw_imu Raw IMU measurement.
    */
-  void add_imu_measurement(const Sophus::SE3d& extrinsic_imu2base, const ImuControl& raw_imu);
+  ImuControl add_imu_measurement(const Sophus::SE3d& extrinsic_imu2base, const ImuControl& raw_imu);
 
   /**
    * Register a LiDAR scan, applying deskewing based on the initial motion guess
@@ -163,10 +163,5 @@ private:
 
   /** Angular velocity of last true IMU measurement expressed in base frame. */
   Eigen::Vector3d _last_real_base_imu_ang_vel = Eigen::Vector3d::Zero();
-
-  double vx = 0.0, vy = 0.0, vz = 0.0;
-  double ax = 0.0, ay = 0.0, az = 0.0;
-  const double alpha = 0.02; // low-pass filter coefficient for velocity and acceleration estimates
-  int counter = 1;
 };
 } // namespace rko_lio::core

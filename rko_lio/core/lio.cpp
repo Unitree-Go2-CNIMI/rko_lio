@@ -251,22 +251,6 @@ std::optional<AccelInfo> LIO::get_accel_info(const Sophus::SO3d& rotation_estima
 // ============================ imu ===============================
 
 void LIO::add_imu_measurement(const ImuControl& base_imu) {
-  ax = alpha * base_imu.acceleration[0] + (1 - alpha) * ax;
-  ay = alpha * base_imu.acceleration[1] + (1 - alpha) * ay;
-  az = alpha * base_imu.acceleration[2] + (1 - alpha) * az;
-
-  vx = alpha * base_imu.angular_velocity[0] * 0.01 + (1 - alpha) * vx;
-  vy = alpha * base_imu.angular_velocity[1] * 0.01 + (1 - alpha) * vy;
-  vz = alpha * base_imu.angular_velocity[2] * 0.01 + (1 - alpha) * vz;
-
-  counter++;
-  if(counter % 50 == 0) {
-    std::cout << std::fixed << std::setprecision(4);
-    std::cout << "Filtered accel: " << ax << ", " << ay << ", " << az
-              << " ||  Filtered ang_vel: " << vx << ", " << vy << ", " << vz << "\n";
-    std::cout << std::defaultfloat;
-  }
-
   if (lidar_state.time < EPSILON_TIME) {
     static bool warning_skip_till_first_lidar = false;
     if (!warning_skip_till_first_lidar) {
@@ -305,16 +289,16 @@ void LIO::add_imu_measurement(const ImuControl& base_imu) {
   _last_real_base_imu_ang_vel = base_imu.angular_velocity;
 }
 
-void LIO::add_imu_measurement(const Sophus::SE3d& extrinsic_imu2base, const ImuControl& raw_imu) {
+ImuControl LIO::add_imu_measurement(const Sophus::SE3d& extrinsic_imu2base, const ImuControl& raw_imu) {
   if (extrinsic_imu2base.log().norm() < EPSILON) {
     add_imu_measurement(raw_imu);
-    return;
+    return raw_imu;
   }
 
   if (_last_real_imu_time < EPSILON_TIME) {
     // skip IMU message as we need a previous imu time for extrinsic compensation
     _last_real_imu_time = raw_imu.time;
-    return;
+    return raw_imu;
   }
 
   // accounting for the transport-rate
@@ -347,6 +331,7 @@ void LIO::add_imu_measurement(const Sophus::SE3d& extrinsic_imu2base, const ImuC
                           base_imu.angular_velocity.cross(base_imu.angular_velocity.cross(lever_arm));
 
   this->add_imu_measurement(base_imu);
+  return base_imu;
 }
 
 // ============================ lidar ===============================

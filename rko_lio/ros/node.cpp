@@ -106,6 +106,8 @@ Node::Node(const std::string& node_name, const rclcpp::NodeOptions& options) {
     map_publish_thead = std::jthread([this]() { publish_map_loop(); });
   }
 
+    filtered_imu_publisher = node->create_publisher<sensor_msgs::msg::Imu>("filtered_imu", publisher_qos);
+
   // lio params
   core::LIO::Config lio_config{};
   lio_config.deskew = node->declare_parameter<bool>("deskew", lio_config.deskew);
@@ -305,7 +307,8 @@ void Node::registration_loop() {
     const auto& [start_stamp, end_stamp, time_vector] = timestamps;
     for (; !imu_buffer.empty() && imu_buffer.front().time < end_stamp; imu_buffer.pop()) {
       const core::ImuControl& imu_data = imu_buffer.front();
-      lio->add_imu_measurement(extrinsic_imu2base, imu_data);
+      core::ImuControl filtered_imu_data = lio->add_imu_measurement(extrinsic_imu2base, imu_data);
+      Node::publish_filtered_imu_data(filtered_imu_data);
     }
     // check if there are more messages buffered already
     atomic_can_process =
@@ -434,4 +437,28 @@ void Node::dump_results_to_disk(const std::filesystem::path& results_dir, const 
   }
 }
 
+void Node::publish_filtered_imu_data(const core::ImuControl& imu_data) {
+  // simple low pass filter for the accel and gyro measurements, to reduce noise for the orientation regularization
+  ax = alpha * imu_data.acceleration[0] + (1 - alpha) * ax;
+  ay = alpha * imu_data.acceleration[1] + (1 - alpha) * ay;
+  az = alpha * imu_data.acceleration[2] + (1 - alpha) * az;
+
+  vx = alpha * imu_data.angular_velocity[0] * 0.01 + (1 - alpha) * vx;
+  vy = alpha * imu_data.angular_velocity[1] * 0.01 + (1 - alpha) * vy;
+  vz = alpha * imu_data.angular_velocity[2] * 0.01 + (1 - alpha) * vz;
+
+  counter++;
+  if(counter % 50 == 0) {
+    std::cout << std::fixed << std::setprecision(4);
+    std::cout << "Filtered accel: " << ax << ", " << ay << ", " << az
+              << " ||  Filtered ang_vel: " << vx << ", " << vy << ", " << vz << "\n";
+    std::cout << std::defaultfloat;
+	sensor_msgs::msg::Imu imu_msg;
+	imu_msg.header.stamp = rclcpp::Time(std::chrono::duration_cast<std::chrono::nanoseconds>(imu_data.time).count());
+	imu_msg.header.frame_id = base_frame;
+	utils::eigen_vector3d_to_ros_xyz(Eigen::Vector3d(ax, ay, az), imu_msg.linear_acceleration);
+	utils::eigen_vector3d_to_ros_xyz(Eigen::Vector3d(vx, vy, vz), imu_msg.angular_velocity);
+	filtered_imu_publisher->publish(imu_msg);
+  }
+  }
 } // namespace rko_lio::ros

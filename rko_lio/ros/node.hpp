@@ -84,6 +84,7 @@ public:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr frame_publisher;
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr map_publisher;
   rclcpp::Publisher<geometry_msgs::msg::AccelStamped>::SharedPtr lidar_accel_publisher;
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr filtered_imu_publisher;
 
   // multithreading
   std::jthread map_publish_thead;
@@ -99,6 +100,12 @@ public:
   std::queue<core::LidarFrame> lidar_buffer;
   size_t max_lidar_buffer_size = 50;
 
+
+  double vx = 0.0, vy = 0.0, vz = 0.0;
+  double ax = 0.0, ay = 0.0, az = 0.0;
+  const double alpha = 0.02; // low-pass filter coefficient for velocity and acceleration estimates
+  int counter = 1;
+
   Node() = delete;
   Node(const std::string& node_name, const rclcpp::NodeOptions& options);
 
@@ -111,6 +118,7 @@ public:
   void publish_lidar_accel(const Eigen::Vector3d& acceleration, const core::Secondsd& stamp) const;
   void publish_map_loop();
   void dump_results_to_disk(const std::filesystem::path& results_dir, const std::string& run_name) const;
+  void publish_filtered_imu_data(const core::ImuControl& imu_data);
 
   ~Node();
   Node(const Node&) = delete;
