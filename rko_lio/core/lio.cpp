@@ -250,6 +250,14 @@ std::optional<AccelInfo> LIO::get_accel_info(const Sophus::SO3d& rotation_estima
 // ============================ imu ===============================
 
 void LIO::add_imu_measurement(const ImuControl& base_imu) {
+  printf("Angular vel x=%f, y=%f, z=%f - ", 
+                                                    base_imu.angular_velocity[0], 
+                                                    base_imu.angular_velocity[1], 
+                                                    base_imu.angular_velocity[2]);
+  printf("Accel: %f, %f, %f\n", 
+                            base_imu.acceleration[0], 
+                            base_imu.acceleration[1], 
+                            base_imu.acceleration[2]);
   if (lidar_state.time < EPSILON_TIME) {
     static bool warning_skip_till_first_lidar = false;
     if (!warning_skip_till_first_lidar) {
